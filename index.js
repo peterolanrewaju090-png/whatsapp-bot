@@ -9,18 +9,8 @@ const { Sticker, StickerTypes } = require('wa-sticker-formatter');
 
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState('auth_info');
-  const sock = makeWASocket({ logger: pino({ level: 'silent' }), auth: state, printQRInTerminal: false, browser: ['Luffy Bot', 'Chrome', '1.0'] });
+  const sock = makeWASocket({ logger: pino({ level: 'silent' }), auth: state, printQRInTerminal: true, browser: ['Luffy Bot', 'Chrome', '1.0'] });
   sock.ev.on('creds.update', saveCreds);
-
-  if (!sock.authState.creds.registered) {
-    const phone = '2349013635052';
-    setTimeout(async () => {
-      try {
-        const code = await sock.requestPairingCode(phone);
-        console.log('Luffy PAIRING CODE: ' + code);
-      } catch (e) { console.log('Pairing error:', e.message); }
-    }, 3000);
-  }
 
   sock.ev.on('connection.update', (u) => {
     const { connection, lastDisconnect } = u;
