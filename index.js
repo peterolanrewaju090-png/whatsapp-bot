@@ -20,7 +20,6 @@ let lastMessages = {};
 const LUFFY_STICKER_URL = 'https://i.imgur.com/3GvwH8h.png';
 const BAD_WORDS = ['fuck', 'shit', 'bitch', 'bastard', 'idiot', 'stupid', 'mumu', 'ode', 'f*ck', 'asshole', 'dick', 'pussy', 'fool'];
 
-// === OWNER - This person can use everything and will never be warned ===
 const OWNER_NUMBER = '2349013635052@s.whatsapp.net';
 
 async function startBot() {
@@ -38,7 +37,6 @@ async function startBot() {
   });
 
   async function autoWarn(from, target, reason, msg) {
-    // Owner can never be warned
     if (target === OWNER_NUMBER) return;
     warns[target] = (warns[target] || 0) + 1;
     const count = warns[target];
@@ -55,7 +53,6 @@ async function startBot() {
   sock.ev.on('messages.upsert', async ({ messages }) => {
     const msg = messages[0];
     if (!msg.message) return;
-    if (msg.key.fromMe) return;
     const from = msg.key.remoteJid;
     const isGroup = from.endsWith('@g.us');
     const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
@@ -65,7 +62,6 @@ async function startBot() {
     const sender = msg.key.participant || msg.key.remoteJid;
     const isOwner = sender === OWNER_NUMBER || from === OWNER_NUMBER;
 
-    // === AUTO MODERATION - Skip for owner ===
     if (isGroup && !lower.startsWith('.') && !isOwner) {
       const foundBadWord = BAD_WORDS.find(w => lower.includes(w));
       if (foundBadWord) { await autoWarn(from, sender, `Foul language`, msg); return; }
@@ -89,7 +85,6 @@ async function startBot() {
 
     if (lower === '.hi' || lower === 'hi') await sock.sendMessage(from, { text: 'Hey! It is Luffy here. What do you want me to do?' }, { quoted: msg });
 
-    // === .afx WITH TAG - Works in DM and Group for everyone, especially owner ===
     if (lower.startsWith('.afx') || lower.startsWith('.ai')) {
       const question = body.replace(/^\.(afx|ai)\s*/i, '');
       if (!question) {
