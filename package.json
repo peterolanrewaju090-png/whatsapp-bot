@@ -7,6 +7,7 @@
     "start": "node index.js"
   },
   "dependencies": {
+    "express": "latest",
     "@whiskeysockets/baileys": "^6.7.0",
     "pino": "^9.0.0",
     "wa-sticker-formatter": "^4.3.2"
