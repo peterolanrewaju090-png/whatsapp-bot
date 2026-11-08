@@ -78,16 +78,19 @@ async function startBot() {
     if (!msg.message) return;
     const from = msg.key.remoteJid;
     const isGroup = from.endsWith('@g.us');
+    const isFromMe = msg.key.fromMe === true;
     const text = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || '';
     const body = text.trim();
     const lower = body.toLowerCase();
     const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
-    const sender = msg.key.participant || msg.key.remoteJid;
-    const isOwner = sender === OWNER_NUMBER || from === OWNER_NUMBER;
+    let sender = msg.key.participant || msg.key.remoteJid;
+    if (isFromMe) sender = OWNER_NUMBER;
+    const isOwner = isFromMe || sender === OWNER_NUMBER || from === OWNER_NUMBER;
     const isCommand = lower.startsWith('.');
     const hasImage = !!msg.message.imageMessage;
     const hasVideo = !!msg.message.videoMessage;
 
+    // Auto-warn only for other people, never for owner, never for your own messages
     if (isGroup && !isCommand && !isOwner && !hasImage && !hasVideo) {
       const foundBadWord = BAD_WORDS.find(w => lower.includes(w));
       if (foundBadWord) { await autoWarn(from, sender, `Bad language`, msg); return; }
@@ -113,7 +116,7 @@ async function startBot() {
 
     if (lower === '.hi' || lower === 'hi') { await sock.sendMessage(from, { text: 'Hey! It is Luffy here. What do you want me to do?' }, { quoted: msg }); await sendLuffySticker(from); return; }
 
-    if (lower === '.s' || lower === '.sticker' || lower === '.stiker' || (hasImage && lower === '.s') || (hasVideo && lower === '.s')) {
+    if (lower === '.s' || lower === '.sticker' || lower === '.stiker') {
       const quoted = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
       try {
         if (quoted?.imageMessage || quoted?.videoMessage) {
