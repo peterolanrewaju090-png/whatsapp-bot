@@ -80,10 +80,39 @@ async function startBot() {
     if (lower === '.ping') await sock.sendMessage(from, { text: 'Pong! Luffy Bot is alive!' }, { quoted: msg });
 
     if (lower === '.menu') {
-      await sock.sendMessage(from, { text: 'LUFFY BOT MENU\n\n.ping - Check if bot is alive\n.menu - Show this menu\n.hi - Say hi\n.afx + question - Ask Luffy AI + Sticker\n.afx @person + question - Ask Luffy about someone (tags them)\n.warn @person - Warn a person\n.warnings @person - Check warns\n.unwarn @person - Remove one warn\n\nAUTO RULES:\n- Foul language = Auto Warn\n- Spamming = Auto Warn\n- 3 warns = Automatic removal\n- Owner can never be warned' }, { quoted: msg });
+      await sock.sendMessage(from, { text: 'LUFFY BOT MENU\n\n.ping - Check if bot is alive\n.menu - Show this menu\n.hi - Say hi\n.play + song name - Play song\n.afx + question - Ask Luffy AI + Sticker\n.afx @person + question - Ask Luffy about someone (tags them)\n.warn @person - Warn a person\n.warnings @person - Check warns\n.unwarn @person - Remove one warn\n\nAUTO RULES:\n- Foul language = Auto Warn\n- Spamming = Auto Warn\n- 3 warns = Automatic removal\n- Owner can never be warned' }, { quoted: msg });
     }
 
     if (lower === '.hi' || lower === 'hi') await sock.sendMessage(from, { text: 'Hey! It is Luffy here. What do you want me to do?' }, { quoted: msg });
+
+    if (lower.startsWith('.play')) {
+      const songName = body.replace(/^\.play\s*/i, '');
+      if (!songName) {
+        await sock.sendMessage(from, { text: 'Please write song name. Example:\n.play Asake Why Love\n.play Burna Boy City Boys' }, { quoted: msg });
+        return;
+      }
+      await sock.sendMessage(from, { text: `Searching for "${songName}"... Wait small, Luffy is finding your song...` }, { quoted: msg });
+      try {
+        const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(songName)}`;
+        const searchRes = await fetch(`https://yt.lemnoslife.com/noKey/search?part=snippet&q=${encodeURIComponent(songName)}&type=video&maxResults=1`);
+        const searchData = await searchRes.json();
+        const videoId = searchData?.items?.[0]?.id?.videoId;
+        const title = searchData?.items?.[0]?.snippet?.title || songName;
+        if (!videoId) throw new Error('not found');
+        const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+        await sock.sendMessage(from, { text: `Found it! 🎵\n\n*${title}*\n\nLink: ${videoUrl}\n\nNow downloading audio... wait small...` }, { quoted: msg });
+        const audioRes = await fetch(`https://api.cobalt.tools/api/json`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ url: videoUrl, isAudioOnly: true, aFormat: 'mp3' }) });
+        const audioData = await audioRes.json();
+        const audioUrl = audioData?.url;
+        if (!audioUrl) throw new Error('audio failed');
+        await sock.sendMessage(from, { audio: { url: audioUrl }, mimetype: 'audio/mp4', fileName: `${title}.mp3` }, { quoted: msg });
+      } catch (e) {
+        console.log('Play error', e);
+        const fallbackUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(songName)}`;
+        await sock.sendMessage(from, { text: `I found the song but I could not download the audio. Click here to listen:\n${fallbackUrl}\n\nTry again with another song name.` }, { quoted: msg });
+      }
+      return;
+    }
 
     if (lower.startsWith('.afx') || lower.startsWith('.ai')) {
       const question = body.replace(/^\.(afx|ai)\s*/i, '');
