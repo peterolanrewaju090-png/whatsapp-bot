@@ -13,6 +13,7 @@ app.listen(process.env.PORT || 10000);
 
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadMediaMessage } = require('@whiskeysockets/baileys');
 const pino = require('pino');
+const { Sticker, StickerTypes } = require('wa-sticker-formatter');
 
 let warns = {};
 let spamTracker = {};
@@ -36,8 +37,14 @@ async function startBot() {
   });
 
   async function sendLuffySticker(from) {
-    try { await sock.sendMessage(from, { sticker: { url: LUFFY_STICKER_URL } }); }
-    catch (e) {
+    try {
+      const res = await fetch(LUFFY_STICKER_URL);
+      const buffer = Buffer.from(await res.arrayBuffer());
+      const sticker = new Sticker(buffer, { pack: 'Luffy Bot', author: 'Monkey D. Luffy', type: StickerTypes.FULL, quality: 80 });
+      const stickerBuffer = await sticker.toBuffer();
+      await sock.sendMessage(from, { sticker: stickerBuffer });
+    } catch (e) {
+      console.log('Sticker failed', e);
       try { await sock.sendMessage(from, { image: { url: LUFFY_STICKER_URL }, caption: 'Luffy Sticker' }); } catch (e2) {}
     }
   }
@@ -85,23 +92,15 @@ async function startBot() {
     const body = text.trim();
     const lower = body.toLowerCase();
 
-    // SELF-BOT MODE + ANTI-LOOP
-    // 1. If it's bot's own reply, ignore it - stops spam loop
     if (lower.includes('luffy says:') || lower.startsWith('pong!') || lower.startsWith('luffy bot menu') || lower.startsWith('found it!') || lower.startsWith('searching for') || lower.startsWith('hey! it is luffy') || lower.startsWith('automatic warning') || lower.startsWith('please write') || lower.startsWith('i could not') || lower.startsWith('reply to a photo') || lower.startsWith('i found the song') || lower.startsWith('luffy sticker')) {
-      // But allow it if YOU typed it as a command - e.g. you typed ".afx ..." that contains those words, we already handled above? No, bot replies start with those, so ignore them
-      // Check if this message is actually from bot: if isFromMe and it looks like bot reply, ignore
       if (isFromMe) return;
-      // If it's from another person and they quoted bot reply, also ignore to avoid loop
       if (lower.startsWith('luffy says:')) return;
     }
 
-    // 2. If it's from you (same number) BUT you are chatting with another person (like Oribim), ignore normal chat to avoid wahala.
-    // Only allow your messages when: you chat with YOURSELF, OR you type a command (starts with .), OR you talk to Luffy, OR it's a group
     if (isFromMe && !isGroup && from !== OWNER_NUMBER) {
       const isCommand = lower.startsWith('.');
       const talksToLuffy = lower.includes('luffy') || lower.includes('hw are u') || lower.includes('how are u') || lower.includes('how are you');
       if (!isCommand && !talksToLuffy) return;
-      // If you type .ping in Oribim chat, we WILL allow it now - self-bot mode ON
     }
 
     const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
@@ -112,7 +111,6 @@ async function startBot() {
     const hasImage = !!msg.message.imageMessage;
     const hasVideo = !!msg.message.videoMessage;
 
-    // Auto warn only for OTHER people in group, never for owner
     if (isGroup && !isCommand && !isOwner && !hasImage && !hasVideo) {
       const foundBadWord = BAD_WORDS.find(w => lower.includes(w));
       if (foundBadWord) { await autoWarn(from, sender, `Bad language`, msg); return; }
@@ -168,13 +166,14 @@ async function startBot() {
         const title = searchData?.items?.[0]?.snippet?.title || songName;
         if (!videoId) throw new Error('not found');
         const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-        await sock.sendMessage(from, { text: `Found it! 🎵\n\n*${title}*\n\nLink: ${videoUrl}\n\nNow downloading audio... please wait...` }, { quoted: msg });
-        const audioRes = await fetch(`https://api.cobalt.tools/api/json`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ url: videoUrl, isAudioOnly: true, aFormat: 'mp3' }) });
-        const audioData = await audioRes.json();
-        const audioUrl = audioData?.url;
+        await sock.sendMessage(from, { text: `Found it! 🎵\n\n*${title}*\n\nNow downloading audio... please wait...` }, { quoted: msg });
+        const dlRes = await fetch(`https://apis.davidcyriltech.my.id/download/ytmp3?url=${encodeURIComponent(videoUrl)}`);
+        const dlData = await dlRes.json();
+        const audioUrl = dlData?.result?.download_url || dlData?.result?.url || dlData?.download_url || dlData?.url;
         if (!audioUrl) throw new Error('audio failed');
         await sock.sendMessage(from, { audio: { url: audioUrl }, mimetype: 'audio/mp4', fileName: `${title}.mp3` }, { quoted: msg });
       } catch (e) {
+        console.log('Play error', e);
         const fallbackUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(songName)}`;
         await sock.sendMessage(from, { text: `I found the song but I could not download the audio. Click here to listen:\n${fallbackUrl}\n\nPlease try again with another song name.` }, { quoted: msg });
       }
