@@ -13,7 +13,7 @@ async function startBot() {
   sock.ev.on('creds.update', saveCreds);
 
   if (!sock.authState.creds.registered) {
-    const phone = process.env.PHONE_NUMBER || '2340000000000';
+    const phone = '2349013635052';
     setTimeout(async () => {
       try {
         const code = await sock.requestPairingCode(phone);
@@ -45,12 +45,7 @@ async function startBot() {
       await sock.sendMessage(from, { text: '🏴‍☠️ *LUFFY BOT MENU*\n\n.ping - Check bot\n.menu - This menu\n.sticker - Reply to image/video to make sticker' }, { quoted: msg });
     }
     if (body === '.sticker' || body === 'sticker') {
-      const quoted = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
-      if (quoted?.imageMessage || quoted?.videoMessage) {
-        await sock.sendMessage(from, { text: 'Send image with caption .sticker' }, { quoted: msg });
-      } else {
-        await sock.sendMessage(from, { text: 'Reply to an image with .sticker' }, { quoted: msg });
-      }
+      await sock.sendMessage(from, { text: 'Reply to an image with .sticker' }, { quoted: msg });
     }
   });
 }
