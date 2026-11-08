@@ -17,9 +17,8 @@ const pino = require('pino');
 let warns = {};
 let spamTracker = {};
 let lastMessages = {};
-const LUFFY_STICKER_URL = 'https://i.imgur.com/3GvwH8h.png';
+const LUFFY_STICKER_URL = 'https://upload.wikimedia.org/wikipedia/en/0/09/Monkey_D._Luffy.png';
 const BAD_WORDS = ['fuck', 'shit', 'bitch', 'bastard', 'idiot', 'stupid', 'mumu', 'ode', 'f*ck', 'asshole', 'dick', 'pussy', 'fool'];
-
 const OWNER_NUMBER = '2349013635052@s.whatsapp.net';
 
 async function startBot() {
@@ -37,7 +36,10 @@ async function startBot() {
   });
 
   async function sendLuffySticker(from) {
-    try { await sock.sendMessage(from, { sticker: { url: LUFFY_STICKER_URL } }); } catch (e) { console.log('Sticker failed'); }
+    try { await sock.sendMessage(from, { sticker: { url: LUFFY_STICKER_URL } }); }
+    catch (e) {
+      try { await sock.sendMessage(from, { image: { url: LUFFY_STICKER_URL }, caption: 'Luffy Sticker' }); } catch (e2) {}
+    }
   }
 
   function getLuffyAnswer(question, lower) {
@@ -82,6 +84,10 @@ async function startBot() {
     const text = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || '';
     const body = text.trim();
     const lower = body.toLowerCase();
+
+    // ANTI-LOOP: Ignore bot's own replies
+    if (isFromMe && (lower.includes('luffy says:') || lower.startsWith('pong!') || lower.startsWith('luffy bot menu') || lower.startsWith('found it!') || lower.startsWith('searching for') || lower.startsWith('hey! it is luffy') || lower.startsWith('automatic warning') || lower.startsWith('please write') || lower.startsWith('i could not') || lower.startsWith('reply to a photo') || lower.startsWith('i found the song') || lower.startsWith('luffy sticker'))) return;
+
     const mentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
     let sender = msg.key.participant || msg.key.remoteJid;
     if (isFromMe) sender = OWNER_NUMBER;
@@ -90,7 +96,6 @@ async function startBot() {
     const hasImage = !!msg.message.imageMessage;
     const hasVideo = !!msg.message.videoMessage;
 
-    // Auto-warn only for other people, never for owner, never for your own messages
     if (isGroup && !isCommand && !isOwner && !hasImage && !hasVideo) {
       const foundBadWord = BAD_WORDS.find(w => lower.includes(w));
       if (foundBadWord) { await autoWarn(from, sender, `Bad language`, msg); return; }
@@ -130,7 +135,6 @@ async function startBot() {
           await sock.sendMessage(from, { text: 'Reply to a photo or video with .s to turn it into a sticker.\nOr send a photo with .s as the caption.\nExample: Reply to photo, then type .s' }, { quoted: msg });
         }
       } catch (e) {
-        console.log('Sticker error', e);
         await sock.sendMessage(from, { text: 'I could not make that sticker. Try a smaller photo or video, maximum 10 seconds.' }, { quoted: msg });
       }
       return;
@@ -138,10 +142,7 @@ async function startBot() {
 
     if (lower.startsWith('.play')) {
       const songName = body.replace(/^\.play\s*/i, '');
-      if (!songName) {
-        await sock.sendMessage(from, { text: 'Please write the song name. Example:\n.play Asake Why Love\n.play Burna Boy City Boys' }, { quoted: msg });
-        return;
-      }
+      if (!songName) { await sock.sendMessage(from, { text: 'Please write the song name. Example:\n.play Asake Why Love\n.play Burna Boy City Boys' }, { quoted: msg }); return; }
       await sock.sendMessage(from, { text: `Searching for "${songName}"... Please wait, Luffy is finding your song...` }, { quoted: msg });
       try {
         const searchRes = await fetch(`https://yt.lemnoslife.com/noKey/search?part=snippet&q=${encodeURIComponent(songName)}&type=video&maxResults=1`);
@@ -157,7 +158,6 @@ async function startBot() {
         if (!audioUrl) throw new Error('audio failed');
         await sock.sendMessage(from, { audio: { url: audioUrl }, mimetype: 'audio/mp4', fileName: `${title}.mp3` }, { quoted: msg });
       } catch (e) {
-        console.log('Play error', e);
         const fallbackUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(songName)}`;
         await sock.sendMessage(from, { text: `I found the song but I could not download the audio. Click here to listen:\n${fallbackUrl}\n\nPlease try again with another song name.` }, { quoted: msg });
       }
@@ -166,10 +166,7 @@ async function startBot() {
 
     if (lower.startsWith('.afx') || lower.startsWith('.ai')) {
       const question = body.replace(/^\.(afx|ai)\s*/i, '');
-      if (!question) {
-        await sock.sendMessage(from, { text: 'Please write something after .afx. Examples:\n.afx my girlfriend left me\n.afx @Raymond my girlfriend left me' }, { quoted: msg });
-        return;
-      }
+      if (!question) { await sock.sendMessage(from, { text: 'Please write something after .afx. Examples:\n.afx my girlfriend left me\n.afx @Raymond my girlfriend left me' }, { quoted: msg }); return; }
       let tagText = '';
       if (mentioned.length > 0) tagText = mentioned.map(jid => `@${jid.split('@')[0]}`).join(' ');
       let reply = getLuffyAnswer(question, lower);
@@ -203,6 +200,7 @@ async function startBot() {
     }
 
     if (!isCommand && body.length > 2 && !hasImage && !hasVideo) {
+      if (lower.includes('luffy says:')) return;
       const isGreeting = lower.includes('hw are u') || lower.includes('how are u') || lower.includes('how are you') || lower.includes('how far') || lower.includes('whats up') || lower.includes("what's up") || lower === 'hi' || lower === 'hello' || lower === 'hey';
       const talksToLuffy = lower.includes('luffy') || lower.includes('bot') || lower.includes('captain') || lower.endsWith('?') || isGreeting;
       if (talksToLuffy) {
